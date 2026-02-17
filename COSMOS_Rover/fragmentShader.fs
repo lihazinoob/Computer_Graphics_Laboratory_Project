@@ -4,10 +4,15 @@ in vec3 color;
 out vec4 FragColor;
 
 uniform vec3 lightColor;
+uniform float ambientStrength;
 
 void main()
 {
-    FragColor = vec4(lightColor * color, 1.0);
+    
+    vec3 ambient = ambientStrength * lightColor;
+
+    vec3 result = ambient * color;
+    FragColor = vec4(result, 1.0);
 }
 
 

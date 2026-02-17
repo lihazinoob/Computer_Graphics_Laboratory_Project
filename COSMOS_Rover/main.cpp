@@ -3,10 +3,14 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-
+#include "vertexObject.h"
+#include "generateObjects.h"
 
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
+float ambientStrength = 1.0;
+
+void processInput(GLFWwindow* window);
 
 
 int main() {
@@ -60,60 +64,74 @@ int main() {
         20, 21, 22, 22, 23, 20  // Top face
     };
 
-    unsigned int VBO, VAO, EBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
+    std::vector<float> sphereVertices;
+    std::vector<unsigned int> sphereIndices;
 
-    glBindVertexArray(VAO);
+    generateSphere(0.5f, 36, 18, sphereVertices, sphereIndices);
 
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
+    VertexObject sphereVAO = createVAO(sphereVertices.data(),
+        sphereVertices.size() * sizeof(float),
+        sphereIndices.data(),
+        sphereIndices.size() * sizeof(unsigned int));
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cubeIndices), cubeIndices, GL_STATIC_DRAW);
+    VertexObject cubeVAO = createVAO(cubeVertices, sizeof(cubeVertices), cubeIndices, sizeof(cubeIndices));
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-
-    glBindVertexArray(0);
 
     while (!glfwWindowShouldClose(window)) {
+
+
+        processInput(window);
         glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         
-        glm::vec3 lightColor(0.0f, 1.0f, 1.0f);
+        glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
         ourShader.use();
         ourShader.setVec3("lightColor", lightColor);
+        ourShader.setFloat("ambientStrength", ambientStrength);
 
 
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::rotate(model, (float)glfwGetTime(), glm::vec3(0.5f, 1.0f, 0.0f));
-
-        glm::mat4 view = glm::mat4(1.0f);
-        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
-
+        // Common View and Projection matrices
+        glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -5.0f));
         glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-
-        ourShader.setMat4("modelTransformationMatrix", model);
         ourShader.setMat4("viewMatrix", view);
         ourShader.setMat4("projectionMatrix", projection);
 
-        glBindVertexArray(VAO);
+        // --- DRAW THE CUBE ---
+        glm::mat4 cubeModel = glm::mat4(1.0f);
+        cubeModel = glm::translate(cubeModel, glm::vec3(-1.2f, 0.0f, 0.0f)); // Move left
+        cubeModel = glm::rotate(cubeModel, (float)glfwGetTime(), glm::vec3(0.5f, 1.0f, 0.0f));
+        ourShader.setMat4("modelTransformationMatrix", cubeModel);
+
+        glBindVertexArray(cubeVAO.VAO);
         glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+
+        // --- DRAW THE SPHERE ---
+        glm::mat4 sphereModel = glm::mat4(1.0f);
+        sphereModel = glm::translate(sphereModel, glm::vec3(1.2f, 0.0f, 0.0f)); // Move right
+        sphereModel = glm::rotate(sphereModel, (float)glfwGetTime() * 0.5f, glm::vec3(0.0f, 1.0f, 0.0f));
+        ourShader.setMat4("modelTransformationMatrix", sphereModel);
+
+        glBindVertexArray(sphereVAO.VAO);
+        glDrawElements(GL_TRIANGLES, (unsigned int)sphereIndices.size(), GL_UNSIGNED_INT, 0);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
+    glDeleteVertexArrays(1, &cubeVAO.VAO);
+    glDeleteBuffers(1, &cubeVAO.VBO);
+    glDeleteBuffers(1, &cubeVAO.EBO);
 
     glfwTerminate();
     return 0;
+}
+
+void processInput(GLFWwindow* window) {
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+        ambientStrength = 0.1f;
+    }
+    else {
+        ambientStrength = 1.0f;
+    }
 }
