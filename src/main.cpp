@@ -9,7 +9,7 @@
 #include "../include/Shader.h"
 #include "../include/utility_functions.h"
 #include "../include/Camera.h"
-
+#include "../include/DirectionalLight.h"
 // ==================== Window Size ====================
 const unsigned int SCR_WIDTH = 1200;
 const unsigned int SCR_HEIGHT = 900;
@@ -30,6 +30,16 @@ int main() {
     const char* fragmentShaderFilePath = "shaders/fragmentShader.fs";
     Shader myShader(vertexShaderFilePath, fragmentShaderFilePath);
 
+
+    // Create a Sun(Directional Light)
+    glm::vec3 sunDirection(-0.8f, -1.0f, 1.0f);
+    glm::vec3 sunAmbient(0.1f, 0.1f, 0.1f); // Dark shadows
+    glm::vec3 sunDiffuse(0.8f, 0.8f, 0.8f); // Bright sunlight
+    glm::vec3 sunSpecular(0.2f, 0.2f, 0.2f); // Low specular for rough dirt
+    DirectionalLight sun(sunDirection, sunAmbient, sunDiffuse, sunSpecular);
+
+
+
     // Create a Terrain using the heatMap
     const char* heightMapPath = "utils/iceland_heightmap.png";
     std::vector<float> terrainHeights;
@@ -37,10 +47,11 @@ int main() {
     std::vector<float>terrainVertices;
     std::vector<unsigned int>terrainIndices;
     generateTerrainFromHeightMap(heightMapPath, 32.0f, 0.0f, terrainVertices, terrainIndices, terrainHeights,tWidth,tHeight);
-
-
     // Now bind the corresponding VAO,VBO and EBO
     VertexObject terrainVAO = createVAOWithPositionAndNormal(terrainVertices, terrainIndices);
+
+    glm::vec3 terrainColor = glm::vec3(0.8f, 0.5f, 0.2f);
+
 
     float globalScale = 0.05f; // The scale you applied to your model
     float playerEyeHeight = 0.2f; // How tall the camera is standing above the dirt
@@ -51,6 +62,10 @@ int main() {
 
     // Render Loop
     while (!glfwWindowShouldClose(window)) {
+        // Clear the Screen and Depth Buffer
+        glClearColor(0.05f, 0.05f, 0.08f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         
         // Calculate deltaTime
         float currentFrame = glfwGetTime();
@@ -67,14 +82,12 @@ int main() {
         float terrainY = getTerrainHeight(camera.cameraPositon.x,camera.cameraPositon.z, terrainHeights, tWidth, tHeight, globalScale);
         camera.cameraPositon.y = terrainY + playerEyeHeight;
 
-
-
-        // Clear the Screen and Depth Buffer
-        glClearColor(0.05f, 0.05f, 0.08f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
         // Use the shader
         myShader.use();
+
+        myShader.setVec3("objectColor", terrainColor);
+        myShader.setVec3("viewPos", camera.cameraPositon);
+        sun.ApplyToShader(myShader);
 
         // Model Matrix (Static now, we are moving the camera, not the world)
         glm::mat4 model = glm::mat4(1.0f);
