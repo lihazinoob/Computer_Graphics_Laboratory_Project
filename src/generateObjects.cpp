@@ -6,7 +6,10 @@
 // Function to generate a Unit-Cube using harcoded vertices
 // Here each vertice will contain the info of point corrdinate and normal coordinate
 
-void generateUnitCubeUsingPositionAndNormal(std::vector<float>& vertices, std::vector<unsigned int>& indices) {
+void generateUnitCubeUsingPositionAndNormal(
+    std::vector<float>& vertices, 
+    std::vector<unsigned int>& indices
+) {
     float data[] = {
         // Back face  (normal: 0,0,-1)
         -0.5f, -0.5f, -0.5f,   0.0f,  0.0f, -1.0f,
@@ -57,7 +60,17 @@ void generateUnitCubeUsingPositionAndNormal(std::vector<float>& vertices, std::v
     indices.assign(idx, idx + indicesArraySize);
 }
 
-void generateTerrainFromHeightMap(const char* heightMapPath,float yScale,float yShift,std::vector<float>&vertices,std::vector<unsigned int>&indices) {
+void generateTerrainFromHeightMap(
+    const char* heightMapPath,
+    float yScale,
+    float yShift,
+    std::vector<float>&vertices,
+    std::vector<unsigned int>&indices,
+    std::vector<float>& heightData,
+    int& imageWidth,
+    int& imageHeight
+
+) {
 
 
     int width, height, numberOfChannels;
@@ -67,6 +80,8 @@ void generateTerrainFromHeightMap(const char* heightMapPath,float yScale,float y
         std::cout << "Failed to load the heightmap: " << heightMapPath;
         return;
     }
+    imageHeight = height;
+    imageWidth = width;
 
     // Now the render through the heightMap. Number of vertices of the terrain = height * width
 
@@ -76,6 +91,8 @@ void generateTerrainFromHeightMap(const char* heightMapPath,float yScale,float y
             // Extract the height from the image.Using the first channel will be enough as for the grayscale image the values are same in all channels
             unsigned char* texels = data + (z * width + x) * numberOfChannels;
             float y = (texels[0] / 255.0f) * yScale - yShift;
+
+            heightData.push_back(y);
 
             // Center the grid around origin (0,0,0) in world space
             float vx = x - width / 2.0f;
