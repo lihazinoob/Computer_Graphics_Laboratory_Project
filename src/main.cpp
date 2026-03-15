@@ -8,10 +8,13 @@
 #include<iostream>
 #include "../include/Shader.h"
 #include "../include/utility_functions.h"
+#include "../include/Camera.h"
 
 // ==================== Window Size ====================
 const unsigned int SCR_WIDTH = 1200;
 const unsigned int SCR_HEIGHT = 900;
+
+Camera camera(glm::vec3(0.0f, 0.0f, 0.0f));
 
 
 int main() {
@@ -39,24 +42,31 @@ int main() {
     // Now bind the corresponding VAO,VBO and EBO
     VertexObject terrainVAO = createVAOWithPositionAndNormal(terrainVertices, terrainIndices);
 
-    // Setup Camera variables
-    glm::vec3 cameraPosition(0.0f, 0.0f, 0.0f);
-    float cameraSpeed = 0.1f;
     float globalScale = 0.05f; // The scale you applied to your model
     float playerEyeHeight = 0.2f; // How tall the camera is standing above the dirt
 
+    // Timing variables for smooth, frame-independent movement
+    float deltaTime = 0.0f;
+    float lastFrame = 0.0f;
 
     // Render Loop
     while (!glfwWindowShouldClose(window)) {
-        // 1. PROCESS INPUT (WASD to move X and Z)
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) cameraPosition.z -= cameraSpeed;
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) cameraPosition.z += cameraSpeed;
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) cameraPosition.x -= cameraSpeed;
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) cameraPosition.x += cameraSpeed;
+        
+        // Calculate deltaTime
+        float currentFrame = glfwGetTime();
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
 
-        // 2. TERRAIN FOLLOWING (Calculate Y based on X and Z)
-        float terrainY = getTerrainHeight(cameraPosition.x, cameraPosition.z, terrainHeights, tWidth, tHeight, globalScale);
-        cameraPosition.y = terrainY + playerEyeHeight;
+        // 1. PROCESS INPUT using the Camera class
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) camera.ProcessKeyboard(FORWARD, deltaTime);
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) camera.ProcessKeyboard(BACKWARD, deltaTime);
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) camera.ProcessKeyboard(LEFT, deltaTime);
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) camera.ProcessKeyboard(RIGHT, deltaTime);
+
+        // 2. TERRAIN FOLLOWING
+        float terrainY = getTerrainHeight(camera.cameraPositon.x,camera.cameraPositon.z, terrainHeights, tWidth, tHeight, globalScale);
+        camera.cameraPositon.y = terrainY + playerEyeHeight;
+
 
 
         // Clear the Screen and Depth Buffer
@@ -71,11 +81,8 @@ int main() {
         model = glm::scale(model, glm::vec3(globalScale, globalScale, globalScale));
 
         // View Matrix
-        glm::mat4 view = glm::mat4(1.0f);
-        // Look down slightly to see the ground
-        view = glm::rotate(view, glm::radians(10.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-        // Move opposite to camera position (OpenGL convention)
-        view = glm::translate(view, -cameraPosition);
+        glm::mat4 view = camera.GetViewMatrix();
+
 
         // Projection Matrix
         glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
