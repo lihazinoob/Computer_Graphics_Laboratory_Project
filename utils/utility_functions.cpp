@@ -42,5 +42,5 @@ float getTerrainHeight(float worldX, float worldZ, const std::vector<float>& hei
     }
 
     // 8. Re-apply the scale to get actual world height
-    return localHeight * scale;
+    return localHeight;
 }

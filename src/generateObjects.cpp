@@ -3,9 +3,13 @@
 #include<iostream>
 #include "../include/stb_image.h"
 #include<glm/glm.hpp>
+
+
+const float PI = 3.14159265359f;
+
+
 // Function to generate a Unit-Cube using harcoded vertices
 // Here each vertice will contain the info of point corrdinate and normal coordinate
-
 void generateUnitCubeUsingPositionAndNormal(
     std::vector<float>& vertices, 
     std::vector<unsigned int>& indices
@@ -148,4 +152,94 @@ void generateTerrainFromHeightMap(
         }
     }
 
+}
+
+
+void generateCylinder(float radius, float height, int sectorCount, std::vector<float>& vertices, std::vector<unsigned int>& indices) {
+    // Clear the vectors just in case they have old data
+    vertices.clear();
+    indices.clear();
+
+    float sectorStep = 2 * PI / sectorCount;
+    float sectorAngle;  // radian
+
+    // ==========================================
+    // 1. GENERATE VERTICES (Positions & Normals)
+    // ==========================================
+
+    // A. Side Vertices
+    for (int i = 0; i <= sectorCount; ++i) {
+        sectorAngle = i * sectorStep;
+
+        // Calculate the X and Z coordinates using basic trig
+        float x = radius * cos(sectorAngle);
+        float z = radius * sin(sectorAngle);
+
+        // The normal for the side points straight out from the center
+        float nx = cos(sectorAngle);
+        float ny = 0.0f;
+        float nz = sin(sectorAngle);
+
+        // Top edge vertex (y = height / 2)
+        vertices.push_back(x); vertices.push_back(height / 2.0f); vertices.push_back(z);
+        vertices.push_back(nx); vertices.push_back(ny); vertices.push_back(nz);
+
+        // Bottom edge vertex (y = -height / 2)
+        vertices.push_back(x); vertices.push_back(-height / 2.0f); vertices.push_back(z);
+        vertices.push_back(nx); vertices.push_back(ny); vertices.push_back(nz);
+    }
+
+    // B. Top and Bottom Center Vertices (for the caps)
+    // Top center index will be: (sectorCount + 1) * 2
+    int topCenterIndex = vertices.size() / 6;
+    vertices.push_back(0.0f); vertices.push_back(height / 2.0f); vertices.push_back(0.0f);
+    vertices.push_back(0.0f); vertices.push_back(1.0f); vertices.push_back(0.0f); // Normal points UP
+
+    // Bottom center index will be: topCenterIndex + 1
+    int bottomCenterIndex = vertices.size() / 6;
+    vertices.push_back(0.0f); vertices.push_back(-height / 2.0f); vertices.push_back(0.0f);
+    vertices.push_back(0.0f); vertices.push_back(-1.0f); vertices.push_back(0.0f); // Normal points DOWN
+
+    // ==========================================
+    // 2. GENERATE INDICES (Connecting the dots)
+    // ==========================================
+
+    // A. Side Triangles
+    for (int i = 0; i < sectorCount; ++i) {
+        int k1 = i * 2;       // Top vertex of current sector
+        int k2 = k1 + 1;      // Bottom vertex of current sector
+        int k3 = k1 + 2;      // Top vertex of NEXT sector
+        int k4 = k1 + 3;      // Bottom vertex of NEXT sector
+
+        // Triangle 1 (Top-Left, Bottom-Left, Top-Right)
+        indices.push_back(k1);
+        indices.push_back(k2);
+        indices.push_back(k3);
+
+        // Triangle 2 (Top-Right, Bottom-Left, Bottom-Right)
+        indices.push_back(k3);
+        indices.push_back(k2);
+        indices.push_back(k4);
+    }
+
+    // B. Top Cap Triangles
+    for (int i = 0; i < sectorCount; ++i) {
+        int k1 = i * 2;       // Edge vertex of current sector
+        int k2 = (i + 1) * 2; // Edge vertex of NEXT sector
+
+        indices.push_back(topCenterIndex);
+        indices.push_back(k1);
+        indices.push_back(k2);
+    }
+
+    // C. Bottom Cap Triangles
+    for (int i = 0; i < sectorCount; ++i) {
+        int k1 = i * 2 + 1;       // Edge vertex of current sector
+        int k2 = (i + 1) * 2 + 1; // Edge vertex of NEXT sector
+
+        // Note: Winding order is reversed here (k2 then k1) so the bottom faces outward!
+        indices.push_back(bottomCenterIndex);
+        indices.push_back(k2);
+        indices.push_back(k1);
+    }
 }

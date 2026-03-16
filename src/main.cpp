@@ -50,10 +50,19 @@ int main() {
     // Now bind the corresponding VAO,VBO and EBO
     VertexObject terrainVAO = createVAOWithPositionAndNormal(terrainVertices, terrainIndices);
 
-    glm::vec3 terrainColor = glm::vec3(0.8f, 0.5f, 0.2f);
+    
+
+    // Create a Tire using the cylinder generation
+    std::vector<float>tireVertices;
+    std::vector<unsigned int> tireIndices;
+    generateCylinder(1.0f, 1.0f, 36, tireVertices, tireIndices);
+    VertexObject tireVAO = createVAOWithPositionAndNormal(tireVertices, tireIndices);
+   
 
 
-    float globalScale = 0.05f; // The scale you applied to your model
+
+
+    float terrainScale = 0.05f; // Scale that is applied so that the terrain does not stretch too much
     float playerEyeHeight = 0.2f; // How tall the camera is standing above the dirt
 
     // Timing variables for smooth, frame-independent movement
@@ -79,20 +88,12 @@ int main() {
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) camera.ProcessKeyboard(RIGHT, deltaTime);
 
         // 2. TERRAIN FOLLOWING
-        float terrainY = getTerrainHeight(camera.cameraPositon.x,camera.cameraPositon.z, terrainHeights, tWidth, tHeight, globalScale);
-        camera.cameraPositon.y = terrainY + playerEyeHeight;
+        float terrainY = getTerrainHeight(camera.cameraPositon.x,camera.cameraPositon.z, terrainHeights, tWidth, tHeight, terrainScale);
+        camera.cameraPositon.y = terrainY * terrainScale + playerEyeHeight;
 
-        // Use the shader
-        myShader.use();
-
-        myShader.setVec3("objectColor", terrainColor);
-        myShader.setVec3("viewPos", camera.cameraPositon);
-        sun.ApplyToShader(myShader);
-
-        // Model Matrix (Static now, we are moving the camera, not the world)
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::scale(model, glm::vec3(globalScale, globalScale, globalScale));
-
+        
+        
+        
         // View Matrix
         glm::mat4 view = camera.GetViewMatrix();
 
@@ -100,15 +101,60 @@ int main() {
         // Projection Matrix
         glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 
-
+        // Use the shader
+        myShader.use();
         // Set those matrices to the shader program
-        myShader.setMat4("model", model);
         myShader.setMat4("view", view);
         myShader.setMat4("projection", projection);
 
-        // Now I can draw the cube
+        
+        myShader.setVec3("viewPos", camera.cameraPositon);
+        sun.ApplyToShader(myShader);
+
+
+        
+        // Now I can draw the terrain
+        glm::mat4 terrainModel = glm::mat4(1.0f);
+        terrainModel = glm::scale(terrainModel, glm::vec3(terrainScale, terrainScale, terrainScale));
+        myShader.setMat4("model", terrainModel);
+        glm::vec3 terrainColor = glm::vec3(0.8f, 0.5f, 0.2f);
+        myShader.setVec3("objectColor", terrainColor);
         glBindVertexArray(terrainVAO.getVAO());
         glDrawElements(GL_TRIANGLES, terrainVAO.getVertexCount(), GL_UNSIGNED_INT, 0);
+        
+
+        // ==========================================
+        // RENDER: FIRST TIRE
+        // ==========================================
+        // 1. Define where you want the tire in WORLD coordinates
+        float targetWorldX = 0.0f;
+        float targetWorldZ = -5.0f;
+        // 2. Query the raw terrain height 
+        float rawTerrainY = getTerrainHeight(targetWorldX, targetWorldZ, terrainHeights, tWidth, tHeight, terrainScale);
+        // 3. Convert the raw terrain height to a scaled world height
+        float worldTerrainY = rawTerrainY * terrainScale;
+        // 4. Set the tire size (Radius)
+        // Since we scale the terrain by 0.05, a tire radius of 1.0 unscaled is HUGE. 
+        // Let's set a realistic radius for the vehicle in world space.
+        float tireRadius = 0.5f;
+        // 5. Build the Model Matrix for the Tire
+        glm::mat4 tireModel = glm::mat4(1.0f);
+        // A. Translate so the bottom of the tire touches the worldTerrainY
+        // We add tireRadius to Y because rotating the cylinder makes its radius its height.
+        tireModel = glm::translate(tireModel, glm::vec3(targetWorldX, worldTerrainY + tireRadius, targetWorldZ));
+        // B. Rotate the cylinder so it stands up like a tire and faces forward
+        tireModel = glm::rotate(tireModel, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        tireModel = glm::rotate(tireModel, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+
+        // C. Scale the tire so its radius matches our desired tireRadius
+        // Since the original cylinder has a radius of 1.0, scaling it by tireRadius makes it the right size.
+        tireModel = glm::scale(tireModel, glm::vec3(tireRadius, tireRadius, tireRadius));
+        // 6. Draw
+        myShader.setMat4("model", tireModel);
+        myShader.setVec3("objectColor", glm::vec3(0.1f, 0.1f, 0.1f));
+        glBindVertexArray(tireVAO.getVAO());
+        glDrawElements(GL_TRIANGLES, tireVAO.getVertexCount(), GL_UNSIGNED_INT, 0);
+
         glfwSwapBuffers(window);
         glfwPollEvents();
 
@@ -119,6 +165,9 @@ int main() {
     glDeleteBuffers(1, &terrainVAO.getVBO());
     glDeleteBuffers(1, &terrainVAO.getEBO());
 
+    glDeleteVertexArrays(1, &tireVAO.getVAO());
+    glDeleteBuffers(1, &tireVAO.getVBO());
+    glDeleteBuffers(1, &tireVAO.getEBO());
     glfwTerminate();
 
 	return 0;

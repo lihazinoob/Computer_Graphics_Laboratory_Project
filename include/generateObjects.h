@@ -13,4 +13,11 @@ void generateTerrainFromHeightMap(
     int& imageWidth,
     int& imageHeight
 );
+void generateCylinder(
+    float radius,
+    float height,
+    int sectorCount,
+    std::vector<float>& vertices,
+    std::vector<unsigned int>& indices
+);
 
