@@ -10,6 +10,7 @@
 #include "../include/utility_functions.h"
 #include "../include/Camera.h"
 #include "../include/DirectionalLight.h"
+#include "../include/Tire.h"
 // ==================== Window Size ====================
 const unsigned int SCR_WIDTH = 1200;
 const unsigned int SCR_HEIGHT = 900;
@@ -56,8 +57,11 @@ int main() {
     std::vector<float>tireVertices;
     std::vector<unsigned int> tireIndices;
     generateCylinder(1.0f, 1.0f, 36, tireVertices, tireIndices);
-    VertexObject tireVAO = createVAOWithPositionAndNormal(tireVertices, tireIndices);
+    VertexObject baseCylinderVAO = createVAOWithPositionAndNormal(tireVertices, tireIndices);
    
+    // Now create a Tire using this base unit cylinder
+    // Tire(VAO, radius, width, number_of_spokes)
+    Tire myTire(&baseCylinderVAO, 0.5f, 0.3f, 8);
 
 
 
@@ -122,39 +126,32 @@ int main() {
         glBindVertexArray(terrainVAO.getVAO());
         glDrawElements(GL_TRIANGLES, terrainVAO.getVertexCount(), GL_UNSIGNED_INT, 0);
         
-
         // ==========================================
-        // RENDER: FIRST TIRE
+        // RENDER: HIERARCHICAL TIRE
         // ==========================================
-        // 1. Define where you want the tire in WORLD coordinates
+        // 1. Where do we want the whole tire assembly to be?
         float targetWorldX = 0.0f;
         float targetWorldZ = -5.0f;
-        // 2. Query the raw terrain height 
         float rawTerrainY = getTerrainHeight(targetWorldX, targetWorldZ, terrainHeights, tWidth, tHeight, terrainScale);
-        // 3. Convert the raw terrain height to a scaled world height
         float worldTerrainY = rawTerrainY * terrainScale;
-        // 4. Set the tire size (Radius)
-        // Since we scale the terrain by 0.05, a tire radius of 1.0 unscaled is HUGE. 
-        // Let's set a realistic radius for the vehicle in world space.
-        float tireRadius = 0.5f;
-        // 5. Build the Model Matrix for the Tire
-        glm::mat4 tireModel = glm::mat4(1.0f);
-        // A. Translate so the bottom of the tire touches the worldTerrainY
-        // We add tireRadius to Y because rotating the cylinder makes its radius its height.
-        tireModel = glm::translate(tireModel, glm::vec3(targetWorldX, worldTerrainY + tireRadius, targetWorldZ));
-        // B. Rotate the cylinder so it stands up like a tire and faces forward
-        tireModel = glm::rotate(tireModel, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        tireModel = glm::rotate(tireModel, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 
-        // C. Scale the tire so its radius matches our desired tireRadius
-        // Since the original cylinder has a radius of 1.0, scaling it by tireRadius makes it the right size.
-        tireModel = glm::scale(tireModel, glm::vec3(tireRadius, tireRadius, tireRadius));
-        // 6. Draw
-        myShader.setMat4("model", tireModel);
-        myShader.setVec3("objectColor", glm::vec3(0.1f, 0.1f, 0.1f));
-        glBindVertexArray(tireVAO.getVAO());
-        glDrawElements(GL_TRIANGLES, tireVAO.getVertexCount(), GL_UNSIGNED_INT, 0);
+        // 2. Build the PARENT matrix for the whole assembly
+        glm::mat4 tireParentTransform = glm::mat4(1.0f);
 
+        // Translate the whole assembly to the terrain surface
+        tireParentTransform = glm::translate(tireParentTransform, glm::vec3(targetWorldX, worldTerrainY + myTire.tireRadius, targetWorldZ));
+
+        // Rotate the whole assembly so it stands up and rolls forward
+        // (Base cylinder points UP natively. We rotate it to point horizontally)
+        tireParentTransform = glm::rotate(tireParentTransform, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        tireParentTransform = glm::rotate(tireParentTransform, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+
+        // Optional: Animate the tire rolling!
+        tireParentTransform = glm::rotate(tireParentTransform, (float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
+
+        // 3. Command the Tire to draw all its parts using this parent transform
+        myTire.Draw(myShader, tireParentTransform);
+        
         glfwSwapBuffers(window);
         glfwPollEvents();
 
@@ -165,9 +162,9 @@ int main() {
     glDeleteBuffers(1, &terrainVAO.getVBO());
     glDeleteBuffers(1, &terrainVAO.getEBO());
 
-    glDeleteVertexArrays(1, &tireVAO.getVAO());
-    glDeleteBuffers(1, &tireVAO.getVBO());
-    glDeleteBuffers(1, &tireVAO.getEBO());
+    glDeleteVertexArrays(1, &baseCylinderVAO.getVAO());
+    glDeleteBuffers(1, &baseCylinderVAO.getVBO());
+    glDeleteBuffers(1, &baseCylinderVAO.getEBO());
     glfwTerminate();
 
 	return 0;

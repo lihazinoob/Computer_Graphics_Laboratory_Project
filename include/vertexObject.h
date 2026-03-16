@@ -1,5 +1,5 @@
 #pragma once
-
+#include <vector>
 // Create a class of vertexObject
 class VertexObject {
 private:
