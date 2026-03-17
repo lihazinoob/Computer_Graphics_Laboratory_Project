@@ -243,3 +243,75 @@ void generateCylinder(float radius, float height, int sectorCount, std::vector<f
         indices.push_back(k1);
     }
 }
+
+
+void generateTorus(
+    float mainRadius,
+    float tubeRadius,
+    int mainSegments,
+    int tubeSegments,
+    std::vector<float>& vertices,
+    std::vector<unsigned int>& indices
+) {
+    vertices.clear();
+    indices.clear();
+
+    float mainStep = 2.0f * PI / mainSegments;
+    float tubeStep = 2.0f * PI / tubeSegments;
+
+    for(int i = 0; i <= mainSegments; i++) {
+        float u = i * mainStep;
+        float cosU = cos(u);
+        float sinU = sin(u);
+        for (int j = 0; j <= tubeSegments; j++) {
+            float v = j * tubeSegments;
+            float cosV = cos(v);
+            float sinV = sin(v);
+
+            // Using the formula of creating the torus calculate x, y and z
+            float x = (mainRadius + tubeRadius * cosV) * cosU;
+            float y = tubeRadius * sinV;
+            float z = (mainRadius + tubeRadius * cosV) * sinU;
+
+            float nx = cosV * cosU;
+            float ny = sinV;
+            float nz = cosV * sinU;
+
+            vertices.push_back(x);
+            vertices.push_back(y);
+            vertices.push_back(z);
+
+            vertices.push_back(nx);
+            vertices.push_back(ny);
+            vertices.push_back(nz);
+        }
+    }
+
+
+
+    // indices
+    //  k1--k1+1
+    //  |  / |
+    //  | /  |
+    //  k2--k2+1
+    for (int i = 0; i < mainSegments; ++i) {
+        for (int j = 0; j < tubeSegments; ++j) {
+            int k1 = i * (tubeSegments + 1) + j;
+            int k2 = k1 + tubeSegments + 1;
+            int k3 = k1 + 1;
+            int k4 = k2 + 1;
+
+            // Triangle 1
+            indices.push_back(k1);
+            indices.push_back(k2);
+            indices.push_back(k3);
+
+            // Triangle 2
+            indices.push_back(k3);
+            indices.push_back(k2);
+            indices.push_back(k4);
+        }
+    }
+
+
+}

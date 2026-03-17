@@ -21,3 +21,12 @@ void generateCylinder(
     std::vector<unsigned int>& indices
 );
 
+void generateTorus(
+    float mainRadius,
+    float tubeRadius,
+    int mainSegments,
+    int tubeSegments,
+    std::vector<float>&vertices,
+    std::vector<unsigned int>& indices
+);
+

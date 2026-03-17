@@ -24,6 +24,7 @@ int main() {
 
     //glfwSetKeyCallback(window, key_callback);
     glEnable(GL_DEPTH_TEST);
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 
     // Load the shader files
@@ -58,15 +59,17 @@ int main() {
     std::vector<unsigned int> tireIndices;
     generateCylinder(1.0f, 1.0f, 36, tireVertices, tireIndices);
     VertexObject baseCylinderVAO = createVAOWithPositionAndNormal(tireVertices, tireIndices);
-   
-    // Now create a Tire using this base unit cylinder
-    // Tire(VAO, radius, width, number_of_spokes)
-    Tire myTire(&baseCylinderVAO, 0.5f, 0.3f, 8);
+    
+    
+    std::vector<float> torusVerts;
+    std::vector<unsigned int> torusInds;
+    generateTorus(0.8f, 0.2f, 36, 18, torusVerts, torusInds);
+    VertexObject baseTorusVAO = createVAOWithPositionAndNormal(torusVerts, torusInds);
+    Tire myTire(&baseCylinderVAO, &baseTorusVAO, 0.5f, 0.3);
 
 
 
-
-    float terrainScale = 0.05f; // Scale that is applied so that the terrain does not stretch too much
+    float terrainScale = 0.5f; // Scale that is applied so that the terrain does not stretch too much
     float playerEyeHeight = 0.2f; // How tall the camera is standing above the dirt
 
     // Timing variables for smooth, frame-independent movement
