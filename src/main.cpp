@@ -1,8 +1,6 @@
 #include "../include/window.h"
 #include "../include/generateObjects.h"
 #include "../include/vertexObject.h"
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include<iostream>
 #include "../include/Shader.h"
@@ -147,8 +145,10 @@ int main() {
         // RENDER: HIERARCHICAL ROVER
         // ==========================================
         // 1. Where do we want the whole rover assembly to be?
-        float targetWorldX = 0.0f;
-        float targetWorldZ = -5.0f;
+        float targetWorldX = rover.position.x;
+        float targetWorldZ =rover.position.z;
+
+        rover.Update(window, deltaTime);
         float rawTerrainY = getTerrainHeight(targetWorldX, targetWorldZ, terrainHeights, tWidth, tHeight, terrainScale);
         float worldTerrainY = rawTerrainY * terrainScale;
 
