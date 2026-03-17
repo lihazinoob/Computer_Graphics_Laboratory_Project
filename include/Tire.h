@@ -19,7 +19,7 @@ public:
     glm::vec3 rubberColor;
     glm::vec3 rimColor;
 
-    Tire(VertexObject* sharedCylinder,VertexObject* sharedTorus, float radius = 0.5f, float width = 0.3f, int spokes = 6);
+    Tire(VertexObject* sharedCylinder,VertexObject* sharedTorus, float radius = 0.5f, float width = 0.3f, int spokes = 12);
 
     // Draw the tire given a parent transform matrix
     void Draw(Shader& shader, glm::mat4 parentTransform);

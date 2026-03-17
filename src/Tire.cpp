@@ -17,8 +17,8 @@ void Tire::Draw(Shader& shader, glm::mat4 parentTransform) {
     // 1. The Centered HUB
     glm::mat4 hubLocal = glm::mat4(1.0f);
     // Scale it to be a small, thick disk in the center
-    float hubRadius = tireRadius * 0.3f;
-    float hubWidth = tireWidth * 1.05f; // Slightly wider than the tire
+    float hubRadius = tireRadius * 0.2f;
+    float hubWidth = tireWidth * .8f; 
     hubLocal = glm::scale(hubLocal, glm::vec3(hubRadius, hubWidth, hubRadius));
 
     // Multiply by parent matrix! 

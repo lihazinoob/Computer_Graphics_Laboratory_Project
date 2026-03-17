@@ -1,4 +1,3 @@
-
 #include "../include/window.h"
 #include "../include/generateObjects.h"
 #include "../include/vertexObject.h"
@@ -10,7 +9,11 @@
 #include "../include/utility_functions.h"
 #include "../include/Camera.h"
 #include "../include/DirectionalLight.h"
-#include "../include/Tire.h"
+#include "../include/Rover.h"
+
+
+
+
 // ==================== Window Size ====================
 const unsigned int SCR_WIDTH = 1200;
 const unsigned int SCR_HEIGHT = 900;
@@ -22,7 +25,9 @@ int main() {
     GLFWwindow* window = createWindowAndInitGL(SCR_WIDTH, SCR_HEIGHT, "COSMOS-Rover | Assignment B1");
     if (!window) return -1;
 
-    //glfwSetKeyCallback(window, key_callback);
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+
     glEnable(GL_DEPTH_TEST);
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
@@ -54,23 +59,27 @@ int main() {
 
     
 
-    // Create a Tire using the cylinder generation
+    // Create a Tire using the cylinder and torus generation
     std::vector<float>tireVertices;
     std::vector<unsigned int> tireIndices;
     generateCylinder(1.0f, 1.0f, 36, tireVertices, tireIndices);
     VertexObject baseCylinderVAO = createVAOWithPositionAndNormal(tireVertices, tireIndices);
-    
-    
     std::vector<float> torusVerts;
     std::vector<unsigned int> torusInds;
     generateTorus(0.8f, 0.2f, 36, 18, torusVerts, torusInds);
     VertexObject baseTorusVAO = createVAOWithPositionAndNormal(torusVerts, torusInds);
-    Tire myTire(&baseCylinderVAO, &baseTorusVAO, 0.5f, 0.3);
+    
+    
+    // Now create the parent rover using the tires
+    float tireRadius = 0.3f;
+    float tireWidth = 0.1f;
+    Rover rover(&baseCylinderVAO, &baseTorusVAO, tireRadius, tireWidth, 12);
+    
 
 
 
     float terrainScale = 0.5f; // Scale that is applied so that the terrain does not stretch too much
-    float playerEyeHeight = 0.2f; // How tall the camera is standing above the dirt
+    float playerEyeHeight = 0.8f; // How tall the camera is standing above the dirt
 
     // Timing variables for smooth, frame-independent movement
     float deltaTime = 0.0f;
@@ -104,9 +113,14 @@ int main() {
         // View Matrix
         glm::mat4 view = camera.GetViewMatrix();
 
+        int currentWidth, currentHeight;
+        glfwGetFramebufferSize(window, &currentWidth, &currentHeight);
 
+        if (currentHeight == 0) {
+            currentHeight = 1;
+        }
         // Projection Matrix
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)currentWidth / (float)currentHeight, 0.1f, 100.0f);
 
         // Use the shader
         myShader.use();
@@ -130,31 +144,25 @@ int main() {
         glDrawElements(GL_TRIANGLES, terrainVAO.getVertexCount(), GL_UNSIGNED_INT, 0);
         
         // ==========================================
-        // RENDER: HIERARCHICAL TIRE
+        // RENDER: HIERARCHICAL ROVER
         // ==========================================
-        // 1. Where do we want the whole tire assembly to be?
+        // 1. Where do we want the whole rover assembly to be?
         float targetWorldX = 0.0f;
         float targetWorldZ = -5.0f;
         float rawTerrainY = getTerrainHeight(targetWorldX, targetWorldZ, terrainHeights, tWidth, tHeight, terrainScale);
         float worldTerrainY = rawTerrainY * terrainScale;
 
-        // 2. Build the PARENT matrix for the whole assembly
-        glm::mat4 tireParentTransform = glm::mat4(1.0f);
+        glm::mat4 roverLocation = glm::mat4(1.0f);
+        // Place the rover exactly on the terrain!
+        roverLocation = glm::translate(roverLocation, glm::vec3(targetWorldX, worldTerrainY, targetWorldZ));
+        // Rotate body to face forward if necessary...
 
-        // Translate the whole assembly to the terrain surface
-        tireParentTransform = glm::translate(tireParentTransform, glm::vec3(targetWorldX, worldTerrainY + myTire.tireRadius, targetWorldZ));
+        // Draw the chassis AND all 4 spinning tires
+        rover.Draw(myShader, roverLocation);
 
-        // Rotate the whole assembly so it stands up and rolls forward
-        // (Base cylinder points UP natively. We rotate it to point horizontally)
-        tireParentTransform = glm::rotate(tireParentTransform, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        tireParentTransform = glm::rotate(tireParentTransform, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-
-        // Optional: Animate the tire rolling!
-        tireParentTransform = glm::rotate(tireParentTransform, (float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
-
-        // 3. Command the Tire to draw all its parts using this parent transform
-        myTire.Draw(myShader, tireParentTransform);
         
+        
+       
         glfwSwapBuffers(window);
         glfwPollEvents();
 
