@@ -11,66 +11,67 @@ Tire::Tire(VertexObject* sharedCylinder,VertexObject* sharedTorus, float radius,
     rimColor = glm::vec3(0.7f, 0.7f, 0.7f);       // Metallic silver
 }
 
-void Tire::Draw(Shader& shader, glm::mat4 parentTransform) {
-    glBindVertexArray(cylinderVAO->getVAO());
+void Tire::DrawCylinderPart(
+    Shader& shader,
+    const glm::mat4& parentTransform,
+    const glm::vec3& translation,
+    const glm::vec3& scale,
+    const glm::vec3& color
+) {
+    glm::mat4 localTransform = glm::mat4(1.0f);
+    localTransform = glm::translate(localTransform, translation);
+    localTransform = glm::scale(localTransform, scale);
 
-    // 1. The Centered HUB
-    glm::mat4 hubLocal = glm::mat4(1.0f);
-    // Scale it to be a small, thick disk in the center
-    float hubRadius = tireRadius * 0.2f;
-    float hubWidth = tireWidth * .8f; 
-    hubLocal = glm::scale(hubLocal, glm::vec3(hubRadius, hubWidth, hubRadius));
-
-    // Multiply by parent matrix! 
-    glm::mat4 hubWorld = parentTransform * hubLocal;
-    shader.setMat4("model", hubWorld);
-    shader.setVec3("objectColor", rimColor);
+    shader.setMat4("model", parentTransform * localTransform);
+    shader.setVec3("objectColor", color);
     glDrawElements(GL_TRIANGLES, cylinderVAO->getVertexCount(), GL_UNSIGNED_INT, 0);
+}
 
-    // ==========================================
-    // 2. Draw the SPOKES
-    // ==========================================
-    float angleStep = 360.0f / numSpokes;
-    float spokeRadius = 0.02f; // Very thin
-    float spokeLength = tireRadius * 0.8f; // Long enough to reach the outer rim
+void Tire::Draw(Shader& shader, glm::mat4 parentTransform) {
+    // Build a chunky rover-style wheel.
+    // The outer rubber uses the shared torus mesh, while the inner mechanical parts use cylinders.
+    // The wheel's axle remains on the local Y axis so the existing Rover transforms still work.
+    float tireOuterRadius = tireRadius;
+    float tireInnerRadius = tireRadius * 0.68f;
+    float tireBodyWidth = tireWidth * 1.35f;
+    float rimFaceWidth = tireWidth * 0.42f;
+    float hubRadius = tireRadius * 0.18f;
+    float hubWidth = tireWidth * 0.78f;
 
-    for (int i = 0; i < numSpokes; i++) {
-        glm::mat4 spokeLocal = glm::mat4(1.0f);
-
-        // A. Rotate to the correct angle pointing outward from center
-        spokeLocal = glm::rotate(spokeLocal, glm::radians(i * angleStep), glm::vec3(0.0f, 1.0f, 0.0f));
-
-        // B. Move it outward so it starts at the hub and ends at the tire
-        spokeLocal = glm::translate(spokeLocal, glm::vec3(spokeLength / 2.0f, 0.0f, 0.0f));
-
-        // C. Rotate the cylinder 90 degrees so it lays flat along X axis
-        spokeLocal = glm::rotate(spokeLocal, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-
-        // D. Scale it to look like a spoke
-        spokeLocal = glm::scale(spokeLocal, glm::vec3(spokeRadius, spokeLength, spokeRadius));
-
-        glm::mat4 spokeWorld = parentTransform * spokeLocal;
-
-        shader.setMat4("model", spokeWorld);
-        shader.setVec3("objectColor", rimColor);
-        glDrawElements(GL_TRIANGLES, cylinderVAO->getVertexCount(), GL_UNSIGNED_INT, 0);
-    }
-
-    // ==========================================
-    // 3. Draw the TREAD using TORUS
-    // ==========================================
+    // Main rubber body from torus geometry
     glBindVertexArray(torusVAO->getVAO());
     glm::mat4 rubberLocal = glm::mat4(1.0f);
-
-    // The torus is naturally generated lying flat on the XZ plane.
-    // The cylinder lays flat too, so they align perfectly.
-    // Scale the raw unit torus to match our desired tire size
-    rubberLocal = glm::scale(rubberLocal, glm::vec3(tireRadius, tireWidth, tireRadius));
-
-    glm::mat4 rubberWorld = parentTransform * rubberLocal;
-    shader.setMat4("model", rubberWorld);
+    rubberLocal = glm::scale(rubberLocal, glm::vec3(tireOuterRadius, tireBodyWidth, tireOuterRadius));
+    shader.setMat4("model", parentTransform * rubberLocal);
     shader.setVec3("objectColor", rubberColor);
     glDrawElements(GL_TRIANGLES, torusVAO->getVertexCount(), GL_UNSIGNED_INT, 0);
 
+    glBindVertexArray(cylinderVAO->getVAO());
 
+    // Recessed metal rim on the front face
+    DrawCylinderPart(
+        shader,
+        parentTransform,
+        glm::vec3(0.0f, tireBodyWidth * 0.18f, 0.0f),
+        glm::vec3(tireInnerRadius, rimFaceWidth, tireInnerRadius),
+        rimColor
+    );
+
+    // Recessed metal rim on the back face
+    DrawCylinderPart(
+        shader,
+        parentTransform,
+        glm::vec3(0.0f, -tireBodyWidth * 0.18f, 0.0f),
+        glm::vec3(tireInnerRadius, rimFaceWidth, tireInnerRadius),
+        rimColor
+    );
+
+    // Central hub protruding slightly through the rim
+    DrawCylinderPart(
+        shader,
+        parentTransform,
+        glm::vec3(0.0f),
+        glm::vec3(hubRadius, hubWidth, hubRadius),
+        glm::vec3(0.48f, 0.48f, 0.48f)
+    );
 }

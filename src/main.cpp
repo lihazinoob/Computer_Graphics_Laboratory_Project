@@ -64,17 +64,21 @@ int main() {
     VertexObject baseCylinderVAO = createVAOWithPositionAndNormal(tireVertices, tireIndices);
     std::vector<float> torusVerts;
     std::vector<unsigned int> torusInds;
-    generateTorus(0.8f, 0.2f, 36, 18, torusVerts, torusInds);
+    generateTorus(0.72f, 0.28f, 36, 18, torusVerts, torusInds);
     VertexObject baseTorusVAO = createVAOWithPositionAndNormal(torusVerts, torusInds);
     
-    
+    // Create a shared cube mesh for rover support structures
+    std::vector<float> cubeVertices;
+    std::vector<unsigned int> cubeIndices;
+    generateUnitCubeUsingPositionAndNormal(cubeVertices, cubeIndices);
+    VertexObject structureVAO = createVAOWithPositionAndNormal(cubeVertices, cubeIndices);
+
     // Now create the parent rover using the tires
     float tireRadius = 0.3f;
     float tireWidth = 0.1f;
-    Rover rover(&baseCylinderVAO, &baseTorusVAO, tireRadius, tireWidth, 12);
+
+    Rover rover(&structureVAO,&baseCylinderVAO, &baseTorusVAO, tireRadius, tireWidth, 12);
     
-
-
 
     float terrainScale = 0.5f; // Scale that is applied so that the terrain does not stretch too much
     float playerEyeHeight = 0.8f; // How tall the camera is standing above the dirt
@@ -157,7 +161,7 @@ int main() {
         roverLocation = glm::translate(roverLocation, glm::vec3(targetWorldX, worldTerrainY, targetWorldZ));
         // Rotate body to face forward if necessary...
 
-        // Draw the chassis AND all 4 spinning tires
+        // Draw the support structures and all 4 spinning tires
         rover.Draw(myShader, roverLocation);
 
         
@@ -176,6 +180,11 @@ int main() {
     glDeleteVertexArrays(1, &baseCylinderVAO.getVAO());
     glDeleteBuffers(1, &baseCylinderVAO.getVBO());
     glDeleteBuffers(1, &baseCylinderVAO.getEBO());
+
+    glDeleteVertexArrays(1, &structureVAO.getVAO());
+    glDeleteBuffers(1, &structureVAO.getVBO());
+    glDeleteBuffers(1, &structureVAO.getEBO());
+
     glfwTerminate();
 
 	return 0;

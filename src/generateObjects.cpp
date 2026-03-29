@@ -264,7 +264,7 @@ void generateTorus(
         float cosU = cos(u);
         float sinU = sin(u);
         for (int j = 0; j <= tubeSegments; j++) {
-            float v = j * tubeSegments;
+            float v = j * tubeStep;
             float cosV = cos(v);
             float sinV = sin(v);
 

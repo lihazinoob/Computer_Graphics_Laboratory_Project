@@ -11,6 +11,8 @@ class Rover {
 public:
     Tire tire;
 
+    VertexObject* structureVAO;
+
     // Dimensions
     glm::vec3 chassisSize;
     
@@ -22,7 +24,7 @@ public:
     float speed;           // Current movement speed
 
     // Constructor gets the required geometries
-    Rover(VertexObject* cylVAO, VertexObject* torVAO,float tireRadius,float tireWidth,float numberOfSpokes);
+    Rover(VertexObject* structureVAO,VertexObject* cylVAO, VertexObject* torVAO,float tireRadius,float tireWidth,float numberOfSpokes);
 
     // Update Rover based on input
     void Update(GLFWwindow* window, float deltaTime);

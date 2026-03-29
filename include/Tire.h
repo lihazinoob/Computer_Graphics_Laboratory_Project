@@ -23,4 +23,13 @@ public:
 
     // Draw the tire given a parent transform matrix
     void Draw(Shader& shader, glm::mat4 parentTransform);
+
+private:
+    void DrawCylinderPart(
+        Shader& shader,
+        const glm::mat4& parentTransform,
+        const glm::vec3& translation,
+        const glm::vec3& scale,
+        const glm::vec3& color
+    );
 };
