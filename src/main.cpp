@@ -66,6 +66,11 @@ int main() {
     std::vector<unsigned int> torusInds;
     generateTorus(0.72f, 0.28f, 36, 18, torusVerts, torusInds);
     VertexObject baseTorusVAO = createVAOWithPositionAndNormal(torusVerts, torusInds);
+
+    std::vector<float> coneVertices;
+    std::vector<unsigned int> coneIndices;
+    generateCone(1.0f, 1.0f, 36, coneVertices, coneIndices);
+    VertexObject baseConeVAO = createVAOWithPositionAndNormal(coneVertices, coneIndices);
     
     // Create a shared cube mesh for rover support structures
     std::vector<float> cubeVertices;
@@ -77,11 +82,12 @@ int main() {
     float tireRadius = 0.3f;
     float tireWidth = 0.1f;
 
-    Rover rover(&structureVAO,&baseCylinderVAO, &baseTorusVAO, tireRadius, tireWidth, 12);
+    Rover rover(&structureVAO, &baseConeVAO, &baseCylinderVAO, &baseTorusVAO, tireRadius, tireWidth, 12);
     
 
     float terrainScale = 0.5f; // Scale that is applied so that the terrain does not stretch too much
-    float playerEyeHeight = 0.8f; // How tall the camera is standing above the dirt
+    float playerEyeHeight = 2.0f; // How tall the camera is standing above the dirt
+    bool togglePressedLastFrame = false;
 
     // Timing variables for smooth, frame-independent movement
     float deltaTime = 0.0f;
@@ -99,15 +105,32 @@ int main() {
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
+        // Toggle between walking mode and free top-view mode.
+        bool togglePressedNow = glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS;
+        if (togglePressedNow && !togglePressedLastFrame) {
+            if (camera.viewMode == GROUND_VIEW) {
+                camera.SetViewMode(TOP_DOWN_VIEW);
+                camera.cameraPositon.y += 14.0f;
+            }
+            else {
+                camera.SetViewMode(GROUND_VIEW);
+            }
+        }
+        togglePressedLastFrame = togglePressedNow;
+
         // 1. PROCESS INPUT using the Camera class
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) camera.ProcessKeyboard(FORWARD, deltaTime);
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) camera.ProcessKeyboard(BACKWARD, deltaTime);
         if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) camera.ProcessKeyboard(LEFT, deltaTime);
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) camera.ProcessKeyboard(RIGHT, deltaTime);
-
-        // 2. TERRAIN FOLLOWING
-        float terrainY = getTerrainHeight(camera.cameraPositon.x,camera.cameraPositon.z, terrainHeights, tWidth, tHeight, terrainScale);
-        camera.cameraPositon.y = terrainY * terrainScale + playerEyeHeight;
+        if (camera.viewMode == TOP_DOWN_VIEW) {
+            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) camera.ProcessKeyboard(UP, deltaTime);
+            if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) camera.ProcessKeyboard(DOWN, deltaTime);
+        }
+        else {
+            float terrainY = getTerrainHeight(camera.cameraPositon.x, camera.cameraPositon.z, terrainHeights, tWidth, tHeight, terrainScale);
+            camera.cameraPositon.y = terrainY * terrainScale + playerEyeHeight;
+        }
 
         
         
@@ -159,7 +182,8 @@ int main() {
         glm::mat4 roverLocation = glm::mat4(1.0f);
         // Place the rover exactly on the terrain!
         roverLocation = glm::translate(roverLocation, glm::vec3(targetWorldX, worldTerrainY, targetWorldZ));
-        // Rotate body to face forward if necessary...
+        // Rotate the entire hierarchical rover so its front faces the camera's viewing direction.
+        roverLocation = glm::rotate(roverLocation, glm::radians(-135.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
         // Draw the support structures and all 4 spinning tires
         rover.Draw(myShader, roverLocation);
@@ -180,6 +204,14 @@ int main() {
     glDeleteVertexArrays(1, &baseCylinderVAO.getVAO());
     glDeleteBuffers(1, &baseCylinderVAO.getVBO());
     glDeleteBuffers(1, &baseCylinderVAO.getEBO());
+
+    glDeleteVertexArrays(1, &baseTorusVAO.getVAO());
+    glDeleteBuffers(1, &baseTorusVAO.getVBO());
+    glDeleteBuffers(1, &baseTorusVAO.getEBO());
+
+    glDeleteVertexArrays(1, &baseConeVAO.getVAO());
+    glDeleteBuffers(1, &baseConeVAO.getVBO());
+    glDeleteBuffers(1, &baseConeVAO.getEBO());
 
     glDeleteVertexArrays(1, &structureVAO.getVAO());
     glDeleteBuffers(1, &structureVAO.getVBO());

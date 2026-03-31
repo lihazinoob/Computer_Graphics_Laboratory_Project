@@ -315,3 +315,89 @@ void generateTorus(
 
 
 }
+
+void generateCone(
+    float radius,
+    float height,
+    int sectorCount,
+    std::vector<float>& vertices,
+    std::vector<unsigned int>& indices
+) {
+    vertices.clear();
+    indices.clear();
+
+    float halfHeight = height * 0.5f;
+    float sectorStep = 2.0f * PI / sectorCount;
+
+    // Side ring vertices. We duplicate the apex per sector so each triangle gets a stable side normal.
+    for (int i = 0; i < sectorCount; ++i) {
+        float angle = i * sectorStep;
+        float x = radius * cos(angle);
+        float z = radius * sin(angle);
+
+        glm::vec3 sideNormal = glm::normalize(glm::vec3(x, radius / height, z));
+
+        vertices.push_back(x);
+        vertices.push_back(-halfHeight);
+        vertices.push_back(z);
+        vertices.push_back(sideNormal.x);
+        vertices.push_back(sideNormal.y);
+        vertices.push_back(sideNormal.z);
+    }
+
+    int apexStartIndex = vertices.size() / 6;
+
+    for (int i = 0; i < sectorCount; ++i) {
+        float angle = i * sectorStep;
+        float x = radius * cos(angle);
+        float z = radius * sin(angle);
+
+        glm::vec3 sideNormal = glm::normalize(glm::vec3(x, radius / height, z));
+
+        vertices.push_back(0.0f);
+        vertices.push_back(halfHeight);
+        vertices.push_back(0.0f);
+        vertices.push_back(sideNormal.x);
+        vertices.push_back(sideNormal.y);
+        vertices.push_back(sideNormal.z);
+    }
+
+    int baseCenterIndex = vertices.size() / 6;
+    vertices.push_back(0.0f);
+    vertices.push_back(-halfHeight);
+    vertices.push_back(0.0f);
+    vertices.push_back(0.0f);
+    vertices.push_back(-1.0f);
+    vertices.push_back(0.0f);
+
+    int baseRingStartIndex = vertices.size() / 6;
+
+    for (int i = 0; i < sectorCount; ++i) {
+        float angle = i * sectorStep;
+        float x = radius * cos(angle);
+        float z = radius * sin(angle);
+
+        vertices.push_back(x);
+        vertices.push_back(-halfHeight);
+        vertices.push_back(z);
+        vertices.push_back(0.0f);
+        vertices.push_back(-1.0f);
+        vertices.push_back(0.0f);
+    }
+
+    for (int i = 0; i < sectorCount; ++i) {
+        int next = (i + 1) % sectorCount;
+
+        indices.push_back(i);
+        indices.push_back(apexStartIndex + i);
+        indices.push_back(next);
+    }
+
+    for (int i = 0; i < sectorCount; ++i) {
+        int next = (i + 1) % sectorCount;
+
+        indices.push_back(baseCenterIndex);
+        indices.push_back(baseRingStartIndex + next);
+        indices.push_back(baseRingStartIndex + i);
+    }
+}
