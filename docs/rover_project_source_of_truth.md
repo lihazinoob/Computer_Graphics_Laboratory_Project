@@ -62,7 +62,7 @@ Important source areas:
 - `src/Tire.cpp`: wheel-only drawing and wheel sub-hierarchy
 - `src/generateObjects.cpp`: procedural primitive generation
 - `src/Camera.cpp`: camera movement and view-matrix behavior
-- `utils/utility_functions.cpp`: terrain-height sampling
+- `utils/utility_functions.cpp`: terrain-height sampling and texture loading
 
 Important headers:
 
@@ -70,7 +70,7 @@ Important headers:
 - `include/Tire.h`: tire interface
 - `include/Camera.h`: camera movement modes and view behavior
 - `include/generateObjects.h`: primitive generation declarations
-- `include/vertexObject.h`: mesh/VAO wrapper
+- `include/vertexObject.h`: mesh/VAO wrapper, including textured-terrain VAO creation
 
 Shader files:
 
@@ -117,6 +117,20 @@ The current division of responsibility is:
 - `Camera` owns movement and view logic
 
 This separation should continue unless the rover assembly becomes crowded enough to justify another class.
+
+### 4. Material / shading split
+
+The renderer currently supports two material paths inside the shared shader:
+
+- flat-color materials for rover parts
+- textured terrain materials for the heightmap terrain
+
+Implementation approach:
+
+- terrain vertices now carry UVs in addition to position and normals
+- the fragment shader uses a `useTexture` switch
+- terrain samples a diffuse texture
+- rover parts continue using `objectColor`
 
 ## What The Project Originally Started With
 
@@ -289,7 +303,59 @@ Why:
 - to make the rover face the camera/viewing direction more appropriately
 - this was done at the parent transform level so the entire hierarchy rotates together
 
-### 11. Two camera modes
+### 11. Directional light and rover spotlight
+
+The scene now uses two active light types:
+
+- one directional light acting as the sun
+- one rover-mounted spotlight acting as the lamp
+
+Directional light behavior:
+
+- provides broad scene lighting
+- can be toggled on and off at runtime
+
+Spotlight behavior:
+
+- is mounted near the rear lamp assembly on the rover
+- uses a cutoff and outer cutoff for a focused beam
+- can be toggled on and off at runtime
+- is positioned and aimed from rover-local coordinates transformed into world space
+
+### 12. Lamp cone orientation fix
+
+The rover lamp previously had a visual mismatch:
+
+- the spotlight beam direction was functionally correct
+- but the rendered cone mesh looked reversed relative to the emitted beam
+
+The fix:
+
+- the cone mesh orientation in `src/Rover.cpp` was flipped so the base of the cone visually faces along the beam direction
+
+Result:
+
+- the lamp now reads as emitting light from the base of the cone
+- the visual cone orientation matches the apparent beam direction more closely
+
+### 13. Terrain texture mapping
+
+The terrain now supports first-pass texture mapping.
+
+Current implementation:
+
+- terrain vertices now include UV coordinates
+- a textured terrain VAO path was added for position/normal/UV vertex layouts
+- the terrain uses `utils/rock_ground_diff_4k.jpg` as a diffuse texture
+- terrain UVs are tiled across the heightmap grid using a fixed tiling factor
+- the shared shader can now render both textured and untextured materials
+
+This means the terrain now has:
+
+- geometry driven by `utils/iceland_heightmap.png`
+- appearance driven by `utils/rock_ground_diff_4k.jpg`
+
+### 14. Two camera modes
 
 The project now supports two different camera behaviors.
 
@@ -338,6 +404,46 @@ Implementation detail:
 - terrain-following only runs in ground mode
 - top-down free movement only runs in top-down mode
 
+### 15. Rover yaw rotation control
+
+The rover can now be rotated manually around the world `Y` axis at runtime.
+
+Behavior:
+
+- `Q` rotates the rover left
+- `E` rotates the rover right
+- the rotation is stored as persistent rover yaw state
+- the full rover hierarchy rotates together because the yaw is applied at the parent transform level in `main.cpp`
+
+Implementation detail:
+
+- `Rover` now owns `yawDegrees` and `rotationSpeed`
+- the yaw is updated in `Rover::Update(...)`
+- `main.cpp` combines the original rover-facing offset with the user-controlled yaw before drawing
+- the rover-mounted spotlight also rotates correctly because its position and direction are derived from the same parent transform
+
+### 16. Cone side texture-seam fix
+
+The cone side UV mapping was corrected to avoid the most obvious side-seam artifact.
+
+The issue:
+
+- the side surface previously wrapped from `u` near `1.0` directly back to `u = 0.0` in the closing triangle
+- that caused the texture to interpolate across the full image width inside one triangle
+- this made the side texture look visibly broken or stretched at the seam
+
+The fix:
+
+- the side of the cone now creates an extra closing vertex column
+- the duplicated closing column uses `u = 1.0`
+- side indices now connect consecutive vertices instead of wrapping directly with modulo for the side seam
+
+Result:
+
+- the texture wraps around the cone side more cleanly
+- the seam is materially smoother
+- some texture compression near the tip still remains, which is expected for a cone because the surface collapses to a point
+
 ## Current Hierarchical Structure
 
 The rover is currently organized conceptually like this:
@@ -348,6 +454,8 @@ The rover is currently organized conceptually like this:
 - mast base / head-support platform
 - two cylindrical sensor stands
 - two cone-shaped eye housings
+- rear lamp stand
+- rear lamp cone
 - four support-arm assemblies
 
 Each support-arm assembly contains:
@@ -403,6 +511,72 @@ Current primitive responsibilities:
 
 This primitive reuse is intentional and should continue when possible.
 
+Additional note:
+
+- the cone primitive is also reused for the rover lamp housing
+
+## Terrain And Material System
+
+### Heightmap terrain
+
+The terrain is still generated from the grayscale heightmap in `utils/iceland_heightmap.png`.
+
+The heightmap is responsible for:
+
+- terrain shape
+- vertex height values
+- terrain normals used for lighting
+
+### Terrain diffuse texture
+
+The terrain now also uses a diffuse color texture:
+
+- `utils/rock_ground_diff_4k.jpg`
+
+This texture is not used to shape the terrain.
+It is used only to color the terrain surface.
+
+So the terrain now has a clear split:
+
+- heightmap controls geometry
+- diffuse texture controls appearance
+
+### Terrain UV mapping
+
+Terrain vertices now store:
+
+- position
+- normal
+- UV coordinates
+
+The UVs are generated procedurally from the terrain grid coordinates in `src/generateObjects.cpp`.
+
+To avoid stretching the texture across the full terrain only once, the UVs are tiled across the grid.
+
+Current implementation detail:
+
+- terrain texture tiling factor is `12.0f`
+
+### Textured terrain rendering path
+
+The terrain uses a separate VAO creation path for vertices containing:
+
+- 3 floats for position
+- 3 floats for normal
+- 2 floats for texture coordinates
+
+The shader path now supports:
+
+- `diffuseTexture` sampler
+- `useTexture` boolean switch
+
+Rendering behavior:
+
+- terrain enables `useTexture`
+- rover disables `useTexture` and continues using flat color
+
+This keeps the terrain texturing work isolated without forcing all procedural meshes onto a textured material path.
+
 ## Controls
 
 Current controls:
@@ -412,13 +586,30 @@ Current controls:
 - `LEFT_SHIFT`: move camera downward in top-down mode
 - `C`: toggle between ground-view and top-down-view camera
 - arrow keys: rover movement
+- `Q`: rotate rover counterclockwise around the `Y` axis
+- `E`: rotate rover clockwise around the `Y` axis
+- `1`: toggle directional light
+- `2`: toggle rover spotlight
 
 ## Known Technical Notes
 
-- Full build verification was previously blocked by a filesystem permission issue in the Visual Studio debug `tlog` path
 - The rover terrain placement logic in `main.cpp` still uses rover position before `rover.Update(...)`; this should be corrected later
 - The camera system currently supports a top-down free camera and a ground-follow camera, but there is not yet a forward-tilted overhead camera mode
 - The current binocular sensor head could still use more mechanical connection detail
+- Terrain texturing currently uses one diffuse image only; there is not yet slope-based blending, detail mapping, or normal mapping
+- The shared shader now supports both textured and untextured materials, which is practical for now but may eventually justify a cleaner material split
+- The cone seam is improved, but textured cones can still show expected pinching near the apex because a pointed surface compresses UV space
+
+## Build Verification
+
+Current status:
+
+- the project builds successfully with `msbuild Learning.sln /t:Build /p:Configuration=Debug /p:Platform=x64`
+
+Remaining warnings are currently limited to:
+
+- numeric conversion warnings already present in parts of the codebase
+- GLFW PDB/linker warnings caused by missing debug symbols for the prebuilt GLFW library
 
 ## Current Strengths Of The Implementation
 
@@ -427,6 +618,8 @@ Current controls:
 - rover hierarchy is easy to extend
 - wheel logic is still isolated inside `Tire`
 - camera logic is becoming more structured rather than ad hoc
+- lighting is now more readable because the rover has both a global sun and a local lamp
+- the terrain now has materially better visual richness due to tiled diffuse texturing
 
 ## Current Weaknesses / Refinement Opportunities
 
@@ -434,6 +627,8 @@ Current controls:
 - upper sensor assembly may look too disconnected without a bridge or lens detail
 - rover placement on terrain should use the updated rover position
 - the current camera is functional, but still simple and axis-aligned
+- terrain texturing is still only first-pass and may show visible repetition depending on camera distance
+- terrain shading would improve further with multi-texture blending based on slope or height
 
 ## Recommended Next Technical Steps
 
@@ -445,7 +640,8 @@ Possible next work items:
 4. refine rover wheel/support proportions
 5. add deck-mounted equipment blocks
 6. fix rover terrain placement timing in `main.cpp`
-7. add a third camera style later if needed, such as an angled overhead camera
+7. improve terrain material quality with slope-based texture blending
+8. add a third camera style later if needed, such as an angled overhead camera
 
 ## Recommended Next Conversation Starting Points
 

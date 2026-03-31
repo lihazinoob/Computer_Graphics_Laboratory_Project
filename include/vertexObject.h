@@ -26,3 +26,4 @@ public:
 };
 
 VertexObject createVAOWithPositionAndNormal(std::vector<float>vertices, std::vector<unsigned int>indices);
+VertexObject createVAOWithPositionNormalAndTexCoord(std::vector<float> vertices, std::vector<unsigned int> indices);

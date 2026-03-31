@@ -90,6 +90,7 @@ void generateTerrainFromHeightMap(
     // Now the render through the heightMap. Number of vertices of the terrain = height * width
 
     //Generate Vertices
+    const float terrainTextureTile = 144.0f;
     for (int z = 0; z < height; z++) {
         for (int x = 0; x < width; x++) {
             // Extract the height from the image.Using the first channel will be enough as for the grayscale image the values are same in all channels
@@ -119,6 +120,8 @@ void generateTerrainFromHeightMap(
             vertices.push_back(norm.x);
             vertices.push_back(norm.y);
             vertices.push_back(norm.z);
+            vertices.push_back((static_cast<float>(x) / static_cast<float>(width - 1)) * terrainTextureTile);
+            vertices.push_back((static_cast<float>(z) / static_cast<float>(height - 1)) * terrainTextureTile);
         }   
     }
     stbi_image_free(data);
@@ -329,13 +332,16 @@ void generateCone(
     float halfHeight = height * 0.5f;
     float sectorStep = 2.0f * PI / sectorCount;
 
-    // Side ring vertices. We duplicate the apex per sector so each triangle gets a stable side normal.
-    for (int i = 0; i < sectorCount; ++i) {
+    int sideBaseStartIndex = 0;
+
+    // Side ring vertices. Duplicate the first column at u = 1.0f so the cone has a clean texture seam.
+    for (int i = 0; i <= sectorCount; ++i) {
         float angle = i * sectorStep;
         float x = radius * cos(angle);
         float z = radius * sin(angle);
 
         glm::vec3 sideNormal = glm::normalize(glm::vec3(x, radius / height, z));
+        float u = static_cast<float>(i) / static_cast<float>(sectorCount);
 
         vertices.push_back(x);
         vertices.push_back(-halfHeight);
@@ -343,16 +349,19 @@ void generateCone(
         vertices.push_back(sideNormal.x);
         vertices.push_back(sideNormal.y);
         vertices.push_back(sideNormal.z);
+        vertices.push_back(u);
+        vertices.push_back(0.0f);
     }
 
-    int apexStartIndex = vertices.size() / 6;
+    int apexStartIndex = vertices.size() / 8;
 
-    for (int i = 0; i < sectorCount; ++i) {
+    for (int i = 0; i <= sectorCount; ++i) {
         float angle = i * sectorStep;
         float x = radius * cos(angle);
         float z = radius * sin(angle);
 
         glm::vec3 sideNormal = glm::normalize(glm::vec3(x, radius / height, z));
+        float u = static_cast<float>(i) / static_cast<float>(sectorCount);
 
         vertices.push_back(0.0f);
         vertices.push_back(halfHeight);
@@ -360,17 +369,21 @@ void generateCone(
         vertices.push_back(sideNormal.x);
         vertices.push_back(sideNormal.y);
         vertices.push_back(sideNormal.z);
+        vertices.push_back(u);
+        vertices.push_back(1.0f);
     }
 
-    int baseCenterIndex = vertices.size() / 6;
+    int baseCenterIndex = vertices.size() / 8;
     vertices.push_back(0.0f);
     vertices.push_back(-halfHeight);
     vertices.push_back(0.0f);
     vertices.push_back(0.0f);
     vertices.push_back(-1.0f);
     vertices.push_back(0.0f);
+    vertices.push_back(0.5f);
+    vertices.push_back(0.5f);
 
-    int baseRingStartIndex = vertices.size() / 6;
+    int baseRingStartIndex = vertices.size() / 8;
 
     for (int i = 0; i < sectorCount; ++i) {
         float angle = i * sectorStep;
@@ -383,14 +396,14 @@ void generateCone(
         vertices.push_back(0.0f);
         vertices.push_back(-1.0f);
         vertices.push_back(0.0f);
+        vertices.push_back(0.5f + 0.5f * cos(angle));
+        vertices.push_back(0.5f + 0.5f * sin(angle));
     }
 
     for (int i = 0; i < sectorCount; ++i) {
-        int next = (i + 1) % sectorCount;
-
-        indices.push_back(i);
+        indices.push_back(sideBaseStartIndex + i);
         indices.push_back(apexStartIndex + i);
-        indices.push_back(next);
+        indices.push_back(sideBaseStartIndex + i + 1);
     }
 
     for (int i = 0; i < sectorCount; ++i) {

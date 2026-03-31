@@ -2,6 +2,7 @@
 #include<vector>
 #include "../include/vertexObject.h"
 #include<glad/glad.h>
+
 VertexObject createVAOWithPositionAndNormal(std::vector<float>vertices,std::vector<unsigned int>indices) {
 	// Create an instance of VertexObject
 	VertexObject vertexObject;
@@ -42,4 +43,37 @@ VertexObject createVAOWithPositionAndNormal(std::vector<float>vertices,std::vect
 
 	return vertexObject;
 
+}
+
+VertexObject createVAOWithPositionNormalAndTexCoord(std::vector<float> vertices, std::vector<unsigned int> indices) {
+	VertexObject vertexObject;
+
+	vertexObject.setVertexCount(indices.size());
+	glGenVertexArrays(1, &vertexObject.getVAO());
+	glGenBuffers(1, &vertexObject.getVBO());
+	glGenBuffers(1, &vertexObject.getEBO());
+
+	glBindVertexArray(vertexObject.getVAO());
+
+	glBindBuffer(GL_ARRAY_BUFFER, vertexObject.getVBO());
+	int verticesSize = vertices.size() * sizeof(float);
+	glBufferData(GL_ARRAY_BUFFER, verticesSize, vertices.data(), GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vertexObject.getEBO());
+	int indicesSize = indices.size() * sizeof(unsigned int);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesSize, indices.data(), GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	glEnableVertexAttribArray(2);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+
+	return vertexObject;
 }

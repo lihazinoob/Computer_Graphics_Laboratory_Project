@@ -7,6 +7,7 @@
 #include "../include/utility_functions.h"
 #include "../include/Camera.h"
 #include "../include/DirectionalLight.h"
+#include "../include/SpotLight.h"
 #include "../include/Rover.h"
 
 
@@ -42,6 +43,18 @@ int main() {
     glm::vec3 sunDiffuse(0.8f, 0.8f, 0.8f); // Bright sunlight
     glm::vec3 sunSpecular(0.2f, 0.2f, 0.2f); // Low specular for rough dirt
     DirectionalLight sun(sunDirection, sunAmbient, sunDiffuse, sunSpecular);
+    SpotLight roverLamp(
+        glm::vec3(0.0f),
+        glm::vec3(0.0f, 0.0f, 1.0f),
+        glm::vec3(0.02f, 0.02f, 0.015f),
+        glm::vec3(0.95f, 0.92f, 0.82f),
+        glm::vec3(1.0f, 0.98f, 0.90f),
+        glm::cos(glm::radians(13.0f)),
+        glm::cos(glm::radians(20.0f)),
+        1.0f,
+        0.09f,
+        0.032f
+    );
 
 
 
@@ -53,7 +66,8 @@ int main() {
     std::vector<unsigned int>terrainIndices;
     generateTerrainFromHeightMap(heightMapPath, 32.0f, 0.0f, terrainVertices, terrainIndices, terrainHeights,tWidth,tHeight);
     // Now bind the corresponding VAO,VBO and EBO
-    VertexObject terrainVAO = createVAOWithPositionAndNormal(terrainVertices, terrainIndices);
+    VertexObject terrainVAO = createVAOWithPositionNormalAndTexCoord(terrainVertices, terrainIndices);
+    unsigned int terrainTexture = loadTexture2D("utils/rock_ground_diff_4k.jpg");
 
     
 
@@ -70,7 +84,8 @@ int main() {
     std::vector<float> coneVertices;
     std::vector<unsigned int> coneIndices;
     generateCone(1.0f, 1.0f, 36, coneVertices, coneIndices);
-    VertexObject baseConeVAO = createVAOWithPositionAndNormal(coneVertices, coneIndices);
+    VertexObject baseConeVAO = createVAOWithPositionNormalAndTexCoord(coneVertices, coneIndices);
+    unsigned int eyeConeTexture = loadTexture2D("utils/birds.jpg");
     
     // Create a shared cube mesh for rover support structures
     std::vector<float> cubeVertices;
@@ -82,12 +97,16 @@ int main() {
     float tireRadius = 0.3f;
     float tireWidth = 0.1f;
 
-    Rover rover(&structureVAO, &baseConeVAO, &baseCylinderVAO, &baseTorusVAO, tireRadius, tireWidth, 12);
+    Rover rover(&structureVAO, &baseConeVAO, &baseCylinderVAO, &baseTorusVAO, eyeConeTexture, tireRadius, tireWidth, 12);
     
 
     float terrainScale = 0.5f; // Scale that is applied so that the terrain does not stretch too much
     float playerEyeHeight = 2.0f; // How tall the camera is standing above the dirt
     bool togglePressedLastFrame = false;
+    bool directionalTogglePressedLastFrame = false;
+    bool spotTogglePressedLastFrame = false;
+    bool directionalLightEnabled = true;
+    bool spotLightEnabled = true;
 
     // Timing variables for smooth, frame-independent movement
     float deltaTime = 0.0f;
@@ -117,6 +136,18 @@ int main() {
             }
         }
         togglePressedLastFrame = togglePressedNow;
+
+        bool directionalTogglePressedNow = glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS;
+        if (directionalTogglePressedNow && !directionalTogglePressedLastFrame) {
+            directionalLightEnabled = !directionalLightEnabled;
+        }
+        directionalTogglePressedLastFrame = directionalTogglePressedNow;
+
+        bool spotTogglePressedNow = glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS;
+        if (spotTogglePressedNow && !spotTogglePressedLastFrame) {
+            spotLightEnabled = !spotLightEnabled;
+        }
+        spotTogglePressedLastFrame = spotTogglePressedNow;
 
         // 1. PROCESS INPUT using the Camera class
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) camera.ProcessKeyboard(FORWARD, deltaTime);
@@ -152,11 +183,23 @@ int main() {
         // Set those matrices to the shader program
         myShader.setMat4("view", view);
         myShader.setMat4("projection", projection);
+        myShader.setInt("diffuseTexture", 0);
 
         
         myShader.setVec3("viewPos", camera.cameraPositon);
-        sun.ApplyToShader(myShader);
-
+        if (directionalLightEnabled) {
+            sun.ApplyToShader(myShader);
+        }
+        else {
+            DirectionalLight disabledSun(
+                sunDirection,
+                glm::vec3(0.0f),
+                glm::vec3(0.0f),
+                glm::vec3(0.0f)
+            );
+            disabledSun.ApplyToShader(myShader);
+        }
+        
 
         
         // Now I can draw the terrain
@@ -165,6 +208,9 @@ int main() {
         myShader.setMat4("model", terrainModel);
         glm::vec3 terrainColor = glm::vec3(0.8f, 0.5f, 0.2f);
         myShader.setVec3("objectColor", terrainColor);
+        myShader.setBool("useTexture", true);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, terrainTexture);
         glBindVertexArray(terrainVAO.getVAO());
         glDrawElements(GL_TRIANGLES, terrainVAO.getVertexCount(), GL_UNSIGNED_INT, 0);
         
@@ -182,10 +228,54 @@ int main() {
         glm::mat4 roverLocation = glm::mat4(1.0f);
         // Place the rover exactly on the terrain!
         roverLocation = glm::translate(roverLocation, glm::vec3(targetWorldX, worldTerrainY, targetWorldZ));
-        // Rotate the entire hierarchical rover so its front faces the camera's viewing direction.
-        roverLocation = glm::rotate(roverLocation, glm::radians(-135.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        // Apply the base facing offset plus user-controlled rover yaw.
+        roverLocation = glm::rotate(roverLocation, glm::radians(-135.0f + rover.yawDegrees), glm::vec3(0.0f, 1.0f, 0.0f));
+
+        // Spotlight source is emitted from the base of the rear lamp cone on the rover.
+        float lowerDeckThickness = 0.12f;
+        float topSupportY = tireRadius + 0.52f;
+        float lowerDeckY = topSupportY + lowerDeckThickness * 0.5f;
+        float topDeckThickness = 0.10f;
+        float topDeckY = lowerDeckY + 0.22f;
+        float topDeckLength = 3.0f * 0.90f;
+        float lampStandHeight = 0.95f;
+        float lampStandZ = -topDeckLength * 0.28f;
+        float lampStandY = topDeckY + topDeckThickness * 0.5f + lampStandHeight * 0.5f;
+        float lampConeLength = 0.24f;
+        float lampConeY = lampStandY + lampStandHeight * 0.5f;
+        float lampConeForwardOffset = 0.12f;
+
+        float lampTiltRadians = glm::radians(28.0f);
+        glm::vec4 lampBaseLocal = glm::vec4(0.0f, lampConeY, lampStandZ + lampConeForwardOffset + lampConeLength * 0.5f, 1.0f);
+        glm::vec4 lampDirectionLocal = glm::vec4(
+            0.0f,
+            -glm::sin(lampTiltRadians),
+            glm::cos(lampTiltRadians),
+            0.0f
+        );
+        roverLamp.Position = glm::vec3(roverLocation * lampBaseLocal);
+        roverLamp.Direction = glm::normalize(glm::vec3(roverLocation * lampDirectionLocal));
+        if (spotLightEnabled) {
+            roverLamp.ApplyToShader(myShader);
+        }
+        else {
+            SpotLight disabledSpot(
+                roverLamp.Position,
+                roverLamp.Direction,
+                glm::vec3(0.0f),
+                glm::vec3(0.0f),
+                glm::vec3(0.0f),
+                roverLamp.CutOff,
+                roverLamp.OuterCutOff,
+                roverLamp.Constant,
+                roverLamp.Linear,
+                roverLamp.Quadratic
+            );
+            disabledSpot.ApplyToShader(myShader);
+        }
 
         // Draw the support structures and all 4 spinning tires
+        myShader.setBool("useTexture", false);
         rover.Draw(myShader, roverLocation);
 
         
@@ -216,6 +306,8 @@ int main() {
     glDeleteVertexArrays(1, &structureVAO.getVAO());
     glDeleteBuffers(1, &structureVAO.getVBO());
     glDeleteBuffers(1, &structureVAO.getEBO());
+    glDeleteTextures(1, &terrainTexture);
+    glDeleteTextures(1, &eyeConeTexture);
 
     glfwTerminate();
 

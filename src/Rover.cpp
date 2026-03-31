@@ -6,22 +6,29 @@ Rover::Rover(
     VertexObject* inConeVAO,
     VertexObject* cylVAO,
     VertexObject* torVAO,
+    unsigned int inEyeConeTexture,
     float tireRadius,
     float tireWidth,
     float numberOfSpokes
 )
-    : tire(cylVAO, torVAO, tireRadius, tireWidth, numberOfSpokes), structureVAO(inStructureVAO), coneVAO(inConeVAO)
+    : tire(cylVAO, torVAO, tireRadius, tireWidth, numberOfSpokes),
+    structureVAO(inStructureVAO),
+    coneVAO(inConeVAO),
+    eyeConeTexture(inEyeConeTexture)
 {
     chassisSize = glm::vec3(2.0f, 0.45f, 3.0f);
     position = glm::vec3(0.0f, 0.0f, -5.0f); // Default starting position
     wheelAngle = 0.0f;
     speed = 5.0f;
+    yawDegrees = 0.0f;
+    rotationSpeed = 90.0f;
 }
 
 
 void Rover::Update(GLFWwindow* window, float deltaTime) {
     // Determine movement distance for this frame based on speed and time
     float moveDistance = speed * deltaTime;
+    float rotationStep = rotationSpeed * deltaTime;
     bool moved = false;
 
     // Using Arrow Keys (UP/DOWN for Z-axis, LEFT/RIGHT for X-axis) to drive the Rover
@@ -40,6 +47,12 @@ void Rover::Update(GLFWwindow* window, float deltaTime) {
     if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
         position.x += moveDistance;
         moved = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) {
+        yawDegrees += rotationStep;
+    }
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
+        yawDegrees -= rotationStep;
     }
 
     if (moved) {
@@ -73,9 +86,9 @@ void Rover::Draw(Shader& shader, glm::mat4 parentTransform) {
     float topDeckY = lowerDeckY + 0.22f;
     float topDeckWidth = chassisSize.x * 1.05f;
     float topDeckLength = chassisSize.z * 0.90f;
-    float mastBaseWidth = 0.78f;
+    float mastBaseWidth = 0.96f;
     float mastBaseHeight = 0.24f;
-    float mastBaseLength = 0.46f;
+    float mastBaseLength = 0.62f;
     float mastBaseY = topDeckY + topDeckThickness * 0.5f + mastBaseHeight * 0.5f;
     float mastBaseZ = -0.18f;
     float sensorStandRadius = 0.08f;
@@ -86,6 +99,16 @@ void Rover::Draw(Shader& shader, glm::mat4 parentTransform) {
     float sensorEyeLength = 0.30f;
     float sensorEyeY = sensorStandY + sensorStandHeight * 0.5f;
     float sensorEyeForwardOffset = 0.08f;
+    float lampStandRadius = 0.06f;
+    float lampStandHeight = 0.95f;
+    float lampStandX = 0.0f;
+    float lampStandZ = -topDeckLength * 0.28f;
+    float lampStandY = topDeckY + topDeckThickness * 0.5f + lampStandHeight * 0.5f;
+    float lampConeRadius = 0.12f;
+    float lampConeLength = 0.24f;
+    float lampConeY = lampStandY + lampStandHeight * 0.5f;
+    float lampConeForwardOffset = 0.12f;
+    float lampTiltDegrees = -28.0f;
 
     glm::vec3 supportColor(0.33f, 0.28f, 0.22f);
     glm::vec3 mountColor(0.42f, 0.42f, 0.42f);
@@ -94,6 +117,8 @@ void Rover::Draw(Shader& shader, glm::mat4 parentTransform) {
     glm::vec3 mastBaseColor(0.58f, 0.56f, 0.50f);
     glm::vec3 sensorStandColor(0.62f, 0.62f, 0.60f);
     glm::vec3 sensorEyeColor(0.68f, 0.68f, 0.66f);
+    glm::vec3 lampStandColor(0.50f, 0.50f, 0.48f);
+    glm::vec3 lampConeColor(0.72f, 0.72f, 0.69f);
 
     auto drawSupportCube = [&](const glm::mat4& localTransform, const glm::vec3& color) {
         if (structureVAO == nullptr) {
@@ -176,6 +201,9 @@ void Rover::Draw(Shader& shader, glm::mat4 parentTransform) {
 
     if (coneVAO != nullptr) {
         glBindVertexArray(coneVAO->getVAO());
+        shader.setBool("useTexture", true);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, eyeConeTexture);
 
         for (float sideSign : { -1.0f, 1.0f }) {
             glm::mat4 sensorEye = glm::mat4(1.0f);
@@ -187,13 +215,49 @@ void Rover::Draw(Shader& shader, glm::mat4 parentTransform) {
                     mastBaseZ + sensorEyeForwardOffset
                 )
             );
-            sensorEye = glm::rotate(sensorEye, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+            sensorEye = glm::rotate(sensorEye, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
             sensorEye = glm::scale(sensorEye, glm::vec3(sensorEyeRadius, sensorEyeLength, sensorEyeRadius));
 
             shader.setMat4("model", parentTransform * sensorEye);
             shader.setVec3("objectColor", sensorEyeColor);
             glDrawElements(GL_TRIANGLES, coneVAO->getVertexCount(), GL_UNSIGNED_INT, 0);
         }
+
+        shader.setBool("useTexture", false);
+
+        glm::mat4 lampCone = glm::mat4(1.0f);
+        lampCone = glm::translate(
+            lampCone,
+            glm::vec3(lampStandX, lampConeY, lampStandZ + lampConeForwardOffset)
+        );
+        lampCone = glm::rotate(lampCone, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        lampCone = glm::rotate(lampCone, glm::radians(lampTiltDegrees), glm::vec3(1.0f, 0.0f, 0.0f));
+        // The spotlight is treated as emitting from the cone's base, so flip the
+        // visual cone to make its wide opening face along the same beam direction.
+        lampCone = glm::rotate(lampCone, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        lampCone = glm::scale(lampCone, glm::vec3(lampConeRadius, lampConeLength, lampConeRadius));
+
+        shader.setMat4("model", parentTransform * lampCone);
+        shader.setVec3("objectColor", lampConeColor);
+        glDrawElements(GL_TRIANGLES, coneVAO->getVertexCount(), GL_UNSIGNED_INT, 0);
+    }
+
+    if (tire.cylinderVAO != nullptr) {
+        glBindVertexArray(tire.cylinderVAO->getVAO());
+
+        glm::mat4 lampStand = glm::mat4(1.0f);
+        lampStand = glm::translate(
+            lampStand,
+            glm::vec3(lampStandX, lampStandY, lampStandZ)
+        );
+        lampStand = glm::scale(
+            lampStand,
+            glm::vec3(lampStandRadius, lampStandHeight, lampStandRadius)
+        );
+
+        shader.setMat4("model", parentTransform * lampStand);
+        shader.setVec3("objectColor", lampStandColor);
+        glDrawElements(GL_TRIANGLES, tire.cylinderVAO->getVertexCount(), GL_UNSIGNED_INT, 0);
     }
 
     glm::vec3 tirePositions[4] = {

@@ -13,6 +13,7 @@ public:
 
     VertexObject* structureVAO;
     VertexObject* coneVAO;
+    unsigned int eyeConeTexture;
 
     // Dimensions
     glm::vec3 chassisSize;
@@ -23,6 +24,8 @@ public:
     
     float wheelAngle;      // Tracks how much the wheels have spun
     float speed;           // Current movement speed
+    float yawDegrees;      // Rotates the whole rover around the Y axis
+    float rotationSpeed;   // Degrees per second for manual turning
 
     // Constructor gets the required geometries
     Rover(
@@ -30,6 +33,7 @@ public:
         VertexObject* coneVAO,
         VertexObject* cylVAO,
         VertexObject* torVAO,
+        unsigned int eyeConeTexture,
         float tireRadius,
         float tireWidth,
         float numberOfSpokes
