@@ -56,7 +56,7 @@ int main() {
         0.032f
     );
 
-
+     
 
     // Create a Terrain using the heatMap
     const char* heightMapPath = "utils/iceland_heightmap.png";
